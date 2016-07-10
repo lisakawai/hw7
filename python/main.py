@@ -178,17 +178,17 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
 
     def calculatePoint(self, g, board):
     	point = 0
-    	for y in range(1,9):
-    		for x in range(1,9):
-    			if Pos(board, x, y) == g.Next():
-    				if x in [1, 8] and y in [1, 8]:
-    					point += 5 
-    				elif (x in [1, 8] and y in range(3, 7)) or (x in range(3, 7) and y in [1, 8]): 
-    					point += 3
-    				elif (x in [1, 8] and y in [2, 7]) or (x in [2, 7] and y in [1, 2, 7, 8]):
-    					point -= 5 
-    				elif (x in [2, 7] and y in range(3, 7)) or (x in range(3, 7) and y in [2, 7]):
-    					point -= -3
+		for y in range(1,9):
+			for x in range(1,9):
+				if Pos(board, x, y) == g.Next():
+					if x in [1, 8] and y in [1, 8]:
+						point += 5
+					elif (x in [1, 8] and y in range(3, 7)) or (x in range(3, 7) and y in [1, 8]): 
+						point += 3
+					elif (x in [1, 8] and y in [2, 7]) or (x in [2, 7] and y in [1, 2, 7, 8]):
+						point -= 5 
+					elif (x in [2, 7] and y in range(3, 7)) or (x in range(3, 7) and y in [2, 7]):
+						point -= 3
 					else:
 						point += 1 
 		return point
