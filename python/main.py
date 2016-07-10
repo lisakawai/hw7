@@ -117,6 +117,8 @@ def ParseMove(move):
 	m = move["Where"]
 	return '%s%d' % (chr(ord('A') + m[0] - 1), m[1])
 
+
+
 class MainHandler(webapp2.RequestHandler):
     # Handling GET request, just for debugging purposes.
     # If you open this handler directly, it will show you the
@@ -134,15 +136,15 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
           return
         else:
           g = Game(self.request.get('json'))
-          self.pickMove(g)
+          self.pickMove1(g)
 
     def post(self):
     	# Reads JSON representation of the board and store as the object.
     	g = Game(self.request.body)
         # Do the picking of a move and print the result.
-        self.pickMove(g)
+        self.pickMove2(g)
 
-    def pickMove(self, g):
+    def pickMove1(self, g):
     	# Gets all valid moves.
     	valid_moves = g.ValidMoves()
     	if len(valid_moves) == 0:
@@ -152,6 +154,44 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
     		# Chooses a valid move randomly if available.
 	    	move = random.choice(g.ValidMoves())
     		self.response.write(ParseMove(move))
+
+    def pickMove2(self, g):
+    	# Gets all valid moves.
+    	valid_moves = g.ValidMoves()
+    	if len(valid_moves) == 0:
+    		# Passes if no valid moves.
+    		self.response.write("PASS")
+    	else:
+    		# Chooses a valid move randomly if available.
+    		move = choose(g)
+	    	# move = random.choice(g.ValidMoves())
+    		self.response.write(ParseMove(move))
+
+    def choose(self, g):
+    	point = -100
+    	for move in g.ValidMoves():
+    		new_board = g.NextBoardPosition(move)
+    		if calculatePoint(g, new_board) > point:
+    			point = calculatePoint(g, new_board)
+    			best_move = move
+    	return best_move
+
+    def calculatePoint(self, g, board):
+    	point = 0
+    	for y in range(1,9):
+    		for x in range(1,9):
+    			if Pos(board, x, y) == g.Next():
+    				if x in [1, 8] and y in [1, 8]:
+    					point += 5 
+    				elif (x in [1, 8] and y in range(3, 7)) or (x in range(3, 7) and y in [1, 8]): 
+    					point += 3
+    				elif (x in [1, 8] and y in [2, 7]) or (x in [2, 7] and y in [1, 2, 7, 8]):
+    					point -= 5 
+    				elif (x in [2, 7] and y in range(3, 7)) or (x in range(3, 7) and y in [2, 7]):
+    					point -= -3
+					else:
+						point += 1 
+		return point
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler)

@@ -1,4 +1,4 @@
-application: random-python-othello
+application: othello-project-1366
 version: v1
 runtime: python27
 api_version: 1
