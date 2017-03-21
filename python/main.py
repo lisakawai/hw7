@@ -96,7 +96,6 @@ class Game:
                 new_board["Next"] = 3 - self.Next()
 		return Game(board=new_board)
 
-
 # Returns piece on the board.
 # 0 for no pieces, 1 for player 1, 2 for player 2.
 # None for coordinate out of scope.
@@ -174,66 +173,55 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
     		# Passes if no valid moves.
     		self.response.write("PASS")
     	else:
-    		# Chooses a valid move randomly if available.
-    		#result = self.choose(g, 3, g.Next())
-	    	#move = result['best_move']
-	    	move = choose(g)
-	    	# move = random.choice(g.ValidMoves())
+	    	#move = random.choice(valid_moves)
+    		result = self.choose(g, 1, g.Next())
+    		move = result['best_move']
     		self.response.write(PrettyMove(move))
 
-   	'''
-  	def choose(self, g):
-  		number = 100
-  		for move in g.ValidMoves:
-  			if len(g.NextBoardPosition(g, move).ValidMoves()) < number:
-  				number = len(g.NextBoardPosition(g, move).ValidMoves())
-  				best_move = move
-  		return best_move
-  	'''
-
-  	
     def choose(self, g, depth, next):
-    	if depth == 0:
-    		return {'point': self.calculatePoint(g), 'best_move': None}
+        if depth == 0:
+            return {'point': self.calculatePoint(g), 'best_move': None}
 
-    	best_move = random.choice(g.ValidMoves())
+        best_move = random.choice(g.ValidMoves())
 
-    	if g.Next != next:
-    		point = -100
-    		for move in g.ValidMoves():
-    			result = self.choose(g.NextBoardPosition(move), depth - 1, next)
-    			if result['point'] > point:
-    				point = result['point']
-    				best_move = move
+        if g.Next == next:
+            point = -100
+            for move in g.ValidMoves():
+                result = self.choose(g.NextBoardPosition(move), depth - 1, next)
+                if result['point'] > point:
+                    point = result['point']
+                    best_move = move
 
-    	elif g.Next == next:
-    		point = 100
-    		for move in g.ValidMoves():
-    			result = self.choose(g.NextBoardPosition(move), depth - 1, next)
-    			if result['point'] < point:
-    				point = result['point']
-    				best_move = move
+        elif g.Next != next:
+            point = 100
+            for move in g.ValidMoves():
+                result = self.choose(g.NextBoardPosition(move), depth - 1, next)
+                if result['point'] < point:
+                    point = result['point']
+                    best_move = move
 
-    	return {'point': point, 'best_move': best_move}
-    	
+        return {'point': point, 'best_move': best_move}
+
+
 
     def calculatePoint(self, h):
-    	point = 0
-    	for y in range(1,9):
-			for x in range(1,9):
-				if h.Pos(x, y) == h.Next():
-					if x in [1, 8] and y in [1, 8]:
-						point += 5
-					elif (x in [1, 8] and y in range(3, 7)) or (x in range(3, 7) and y in [1, 8]): 
-						point += 3
-					elif (x in [1, 8] and y in [2, 7]) or (x in [2, 7] and y in [1, 2, 7, 8]):
-						point -= 5 
-					elif (x in [2, 7] and y in range(3, 7)) or (x in range(3, 7) and y in [2, 7]):
-						point -= 3
-					else:
-						point += 1 
+        point = 0
+        for y in range(1,9):
+            for x in range(1,9):
+                if h.Pos(x, y) == h.Next():
+                    if x in [1, 8] and y in [1, 8]:
+                        point += 5
+                    elif (x in [1, 8] and y in range(3, 7)) or (x in range(3, 7) and y in [1, 8]): 
+                        point += 3
+                    elif (x in [1, 8] and y in [2, 7]) or (x in [2, 7] and y in [1, 2, 7, 8]):
+                        point -= 5 
+                    elif (x in [2, 7] and y in range(3, 7)) or (x in range(3, 7) and y in [2, 7]):
+                        point -= 3
+                    else:
+                        point += 1 
 
-	return point
+        return point
+
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler)
