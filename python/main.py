@@ -27,16 +27,18 @@ BOARD_2 = np.array([[ 45, -11,  4, -1, -1,  4, -11,  45],
                     [-11, -16, -1, -3, -3, -1, -16, -11],
                     [ 45, -11,  4, -1, -1,  4, -11,  45]])
 
+BOARD_FIN = np.ones((8,8))
+
 # Reads json description of the board and provides simple interface.
 class Game:
 	# Takes json or a board directly.
-	def __init__(self, body=None, board=None):
+	def __init__(self, body=None, board=None, count=4):
                 if body:
 		        game = json.loads(body)
                         self._board = game["board"]
                 else:
                         self._board = board
-                
+                self.count = count
 
 	# Returns piece on the board.
 	# 0 for no pieces, 1 for player 1, 2 for player 2.
@@ -148,7 +150,7 @@ def PrettyMove(move):
 
 def signal_handler(signum, frame):
         raise Exception('time out')
-
+                
 class MainHandler(webapp2.RequestHandler):
     # Handling GET request, just for debugging purposes.
     # If you open this handler directly, it will show you the
@@ -196,19 +198,19 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
                 """
                 result = self.choose(g, 2, g.Next())
     		move = result['best_move']
-    		self.response.write(PrettyMove(move))
+                self.response.write(PrettyMove(move))
 
     def choose(self, g, depth, next):
         if depth == 0:
-            logging.info("depth%d, point%d", depth, self.calculatePoint(g))
-            return {'point': self.calculatePoint(g) + len(g.ValidMoves())*2, 'best_move': None}
+            #logging.info("depth%d, point%d", depth, self.calculatePoint(g))
+            return {'point': self.calculatePoint(g), 'best_move': None}
         
         if not g.ValidMoves():
             if g.Next() == next:
-                logging.info("depth%d, point%d", depth, 100)
+                #logging.info("depth%d, point%d", depth, 100)
                 return {'point': 100, 'best_move': None}
             else:
-                logging.info("depth%d, point%d", depth, -100)
+                #logging.info("depth%d, point%d", depth, -100)
                 return {'point': -100, 'best_move': None}
         
         best_move = random.choice(g.ValidMoves())
@@ -227,14 +229,19 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
                 if result['point'] < point:
                     point = result['point']
                     best_move = move
-        logging.info("depth%d, point%d", depth, point)
+        #logging.info("depth%d, point%d", depth, point)
         return {'point': point, 'best_move': best_move}
 
     def calculatePoint(self, h):
-        board = [[1 if h.Pos(x, y) == h.Next() else 0 for x in range(1,9)] for y in range(1,9)]
-        #logging.info(board)
-        board = np.array(board)
-        point = np.sum(board * BOARD_2)
+        board = np.array([[1 if h.Pos(x, y) == h.Next() else 0 for x in range(1,9)] for y in range(1,9)])
+        empty = np.array([[1 if h.Pos(x, y) == 0 else 0 for x in range(1,9)] for y in range(1,9)])
+        empty = np.sum(empty)
+        logging.info(empty)
+        point = len(h.ValidMoves()) * 2
+        if empty < 7:
+                point += np.sum(board * BOARD_FIN)
+        else:
+                point += np.sum(board * BOARD_2)
         return point
 
 app = webapp2.WSGIApplication([
