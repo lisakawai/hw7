@@ -184,14 +184,22 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
     		# Passes if no valid moves.
     		self.response.write("PASS")
     	else:
-                empty = np.sum([[1 if g.Pos(x, y) == 0 else 0 for x in xrange(1,9)] for y in xrange(1,9)])
-                if empty < 15:
-                        self.best_point = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}, 6:{}, 7:{}, 8:{}, 9:{}, 10:{}, 11:{}, 12:{}, 13:{}, 14:{}}
-                        result = self.choose_final(g, 6, g.Next(), [0])
+                self.empty = np.sum([[1 if g.Pos(x, y) == 0 else 0 for x in xrange(1,9)] for y in xrange(1,9)])
+                self.best_point = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}, 6:{}, 7:{}, 8:{}, 9:{}, 10:{}, 11:{}, 12:{}, 13:{}, 14:{}}
+                self.threshold0 = 13
+                self.threshold1 = 16
+                self.threshold2 = 24
+                if self.empty < self.threshold0:
+                        result = self.choose_final(g, min(6, self.empty), g.Next(), [0])
+                elif self.empty < self.threshold1:
+                        result = self.choose_final(g, 4, g.Next(), [0])
+                elif self.empty < self.threshold2:
+                        result = self.choose_final(g, 3, g.Next(), [0])
                 else:
-                        #logging.info(empty)
-                        self.best_point = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}}
-                        result = self.choose(g, 3, g.Next(), [0])
+                        if len(g.ValidMoves()) < 7:
+                                result = self.choose(g, 3, g.Next(), [0])
+                        else:
+                                result = self.choose(g, 2, g.Next(), [0])
     		move = result['best_move']
                 self.response.write(PrettyMove(move))
         elapsed_time = time.time()-start
@@ -201,12 +209,15 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
         validmove = g.ValidMoves()
         if depth == 0:
             final_open = 0
-            #if validmove:
-            #        for move in validmove:
-            #                open = self.calculateOpenness(g, g.NextBoardPosition(move))
-            #                if open > final_open:
-            #                        final_open = open
-            return {'point': self.calculatePoint(g, next) + open_point + final_open, 'best_move': None}
+            if validmove:
+                    for move in validmove:
+                            open = self.calculateOpenness(g, g.NextBoardPosition(move))
+                            if open < final_open:
+                                    final_open = open
+            if g.Next() != next:
+                    final_open *= -1
+            logging.info("open_point%d, final_open%d", open_point, final_open)
+            return {'point': self.calculatePoint(g, next) + 3*(open_point + final_open), 'best_move': None}
         
         if not validmove:
             if g.Next() == next:
@@ -222,8 +233,8 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
                 g_next = g.NextBoardPosition(move)
                 openness = self.calculateOpenness(g, g_next)
                 result = self.choose(g_next, depth - 1, next, new_index, open_point + openness)
-                #logging.info(new_index)
-                #logging.info("result%d, depth%d", result['point'], depth)
+                logging.info(move)
+                logging.info("result%d, depth%d", result['point'], depth)
                 self.best_point[depth-1] = {}
                 if not self.best_point[depth].has_key(new_index[1]):
                         self.best_point[depth][new_index[1]] = result['point']
@@ -250,8 +261,8 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
                 g_next = g.NextBoardPosition(move)
                 openness = self.calculateOpenness(g, g_next)
                 result = self.choose(g_next, depth - 1, next, new_index, open_point - openness)
-                #logging.info(new_index)
-                #logging.info("result%d, depth%d", result['point'], depth)
+                logging.info(move)
+                logging.info("result%d, depth%d", result['point'], depth)
                 #logging.info("point%d", result['point'])
                 self.best_point[depth-1] = {}
                 if not self.best_point[depth].has_key(new_index[1]):
@@ -276,10 +287,14 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
         validmove = g.ValidMoves()
         #logging.info(validmove)
         if depth == 0:
-                #logging.info(next==g.Next())
-                board_me = np.array([[1 if g.Pos(x, y) == next else 0 for x in xrange(1,9)] for y in xrange(1,9)])
-                board_enemy = np.array([[1 if g.Pos(x, y) not in [next, 0] else 0 for x in xrange(1,9)] for y in xrange(1,9)])
-                point = np.sum(board_me * BOARD_FIN) - np.sum(board_enemy * BOARD_FIN)
+                logging.info(next==g.Next())
+                if self.empty < self.threshold0:
+                        board_me = np.array([[1 if g.Pos(x, y) == next else 0 for x in xrange(1,9)] for y in xrange(1,9)])
+                        board_enemy = np.array([[1 if g.Pos(x, y) not in [next, 0] else 0 for x in xrange(1,9)] for y in xrange(1,9)])
+                        point = np.sum(board_me * BOARD_FIN) - np.sum(board_enemy * BOARD_FIN)
+                else:
+                        point = self.calculatePoint(g, next)
+                logging.info(point)
                 return {'point': point, 'best_move': None}
         
         if not validmove:
@@ -338,7 +353,13 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
         #logging.info(next==h.Next())
         board_me = np.array([[1 if h.Pos(x, y) == next else 0 for x in xrange(1,9)] for y in xrange(1,9)])
         board_enemy = np.array([[1 if h.Pos(x, y) not in [next, 0] else 0 for x in xrange(1,9)] for y in xrange(1,9)])
-        point = len(h.ValidMoves()) + np.sum(board_me * BOARD_2) - np.sum(board_enemy * BOARD_2)
+        point = np.sum(board_me * BOARD_2) - np.sum(board_enemy * BOARD_2)
+        logging.info("calculate%d", point)
+        if h.Next() == next:
+                point += len(h.ValidMoves())
+        else:
+                point -= len(h.ValidMoves())
+        logging.info("len%d", len(h.ValidMoves()))
         return point
 
     def calculateOpenness(self, h, h_next):
@@ -353,4 +374,3 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
 app = webapp2.WSGIApplication([
     ('/', MainHandler)
 ], debug=True)
-

@@ -32,12 +32,13 @@ BOARD_FIN = np.ones((8,8))
 # Reads json description of the board and provides simple interface.
 class Game:
 	# Takes json or a board directly.
-	def __init__(self, body=None, board=None):
+	def __init__(self, body=None, board=None, count=4):
                 if body:
 		        game = json.loads(body)
                         self._board = game["board"]
                 else:
                         self._board = board
+                self.count = count
 
 	# Returns piece on the board.
 	# 0 for no pieces, 1 for player 1, 2 for player 2.
@@ -155,7 +156,6 @@ class MainHandler(webapp2.RequestHandler):
     # If you open this handler directly, it will show you the
     # HTML form here and let you copy-paste some game's JSON
     # here for testing.
-
     def get(self):
         if not self.request.get('json'):
           self.response.write("""
@@ -179,106 +179,75 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
     def pickMove2(self, g):
     	# Gets all valid moves.
     	valid_moves = g.ValidMoves()
-        start = time.time()
     	if len(valid_moves) == 0:
     		# Passes if no valid moves.
     		self.response.write("PASS")
     	else:
                 empty = np.sum([[1 if g.Pos(x, y) == 0 else 0 for x in xrange(1,9)] for y in xrange(1,9)])
-                if empty < 15:
-                        self.best_point = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}, 6:{}, 7:{}, 8:{}, 9:{}, 10:{}, 11:{}, 12:{}, 13:{}, 14:{}}
-                        result = self.choose_final(g, 6, g.Next(), [0])
+                if empty < 7:
+                        result = self.choose_final(g, empty, g.Next())
                 else:
-                        #logging.info(empty)
-                        self.best_point = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}}
-                        result = self.choose(g, 3, g.Next(), [0])
+                        result = self.choose(g, 2, g.Next())
     		move = result['best_move']
                 self.response.write(PrettyMove(move))
-        elapsed_time = time.time()-start
-        logging.info(elapsed_time)
 
-    def choose(self, g, depth, next, index, open_point=0):
-        validmove = g.ValidMoves()
+    def choose(self, g, depth, next, open_point=0):
+        move_list = []
+        while depth > 0:
+                validmove = g.ValidMoves()
+                if not validmove:
+                        if g.Next() == next:
+                                return {'point': 100, 'best_move': None}
+                        else:
+                                return {'point': -100, 'best_move': None}
+                elif g.Next() == next:
+                        for move in validmove:
+                                g_next = g.NextBoardPosition(move)
+                                openness = self.calculateOpenness(g, g_next)
+                                
+                                result = self.choose(g_next, depth - 1, next, open_point + openness)
+                                if result['point'] > point:
+                                        point = result['point']
+                                        best_move = move
+
+                                        
         if depth == 0:
             final_open = 0
-            #if validmove:
-            #        for move in validmove:
-            #                open = self.calculateOpenness(g, g.NextBoardPosition(move))
-            #                if open > final_open:
-            #                        final_open = open
-            return {'point': self.calculatePoint(g, next) + open_point + final_open, 'best_move': None}
-        
-        if not validmove:
-            if g.Next() == next:
-                return {'point': 100, 'best_move': None}
-            else:
-                return {'point': -100, 'best_move': None}
+            if validmove:
+                    for move in validmove:
+                            open = self.calculateOpenness(g, g.NextBoardPosition(move))
+                            if open > final_open:
+                                    final_open = open
+            return {'point': self.calculatePoint(g) + open_point + final_open, 'best_move': None}
         
         best_move = random.choice(validmove)
         if g.Next() == next: # next is me 
             point = -100
-            for i, move in enumerate(validmove):
-                new_index = [i] + index 
+            for move in validmove:
                 g_next = g.NextBoardPosition(move)
                 openness = self.calculateOpenness(g, g_next)
-                result = self.choose(g_next, depth - 1, next, new_index, open_point + openness)
-                #logging.info(new_index)
-                #logging.info("result%d, depth%d", result['point'], depth)
-                self.best_point[depth-1] = {}
-                if not self.best_point[depth].has_key(new_index[1]):
-                        self.best_point[depth][new_index[1]] = result['point']
-                if len(new_index) > 2:
-                        if self.best_point[depth + 1].has_key(new_index[2]):
-                                if result['point'] > self.best_point[depth+1][new_index[2]]:
-                                        #logging.info("cut")
-                                        #self.best_point[depth][new_index[1]] = result['point']
-                                        point = result['point']
-                                        best_move = move
-                                        break
+                result = self.choose(g_next, depth - 1, next, open_point + openness)
                 if result['point'] > point:
-                        point = result['point']
-                        best_move = move
-                        self.best_point[depth][new_index[1]] = result['point']
-                #logging.info("point%d, depth%d", point, depth)
-                #logging.info(self.best_point)
-                        
+                    point = result['point']
+                    best_move = move
+            #logging.info("hey, depth%d, point%d, next%d", depth, point, next)
+
         elif g.Next() != next: # next is enemy
             point = 100
-            for i, move in enumerate(validmove):
-                new_index = [i] + index
-                #logging.info(new_index)
+            for move in validmove:
                 g_next = g.NextBoardPosition(move)
                 openness = self.calculateOpenness(g, g_next)
-                result = self.choose(g_next, depth - 1, next, new_index, open_point - openness)
-                #logging.info(new_index)
-                #logging.info("result%d, depth%d", result['point'], depth)
-                #logging.info("point%d", result['point'])
-                self.best_point[depth-1] = {}
-                if not self.best_point[depth].has_key(new_index[1]):
-                        self.best_point[depth][new_index[1]] = result['point']
-                if len(new_index) > 2:
-                        if self.best_point[depth + 1].has_key(new_index[2]):
-                                if result['point'] < self.best_point[depth+1][new_index[2]]:
-                                        logging.info("short")
-                                        point = result['point']
-                                        best_move = move
-                                        #self.best_point[depth][new_index[1]] = result['point']
-                                        break
+                result = self.choose(g_next, depth - 1, next, open_point - openness)
                 if result['point'] < point:
                     point = result['point']
                     best_move = move
-                    self.best_point[depth][new_index[1]] = result['point']
-                #logging.info("point%d, depth%d", point, depth)
-                #logging.info(self.best_point)
         return {'point': point, 'best_move': best_move}
 
-    def choose_final(self, g, depth, next, index):
+    def choose_final(self, g, depth, next):
         validmove = g.ValidMoves()
-        #logging.info(validmove)
         if depth == 0:
-                #logging.info(next==g.Next())
-                board_me = np.array([[1 if g.Pos(x, y) == next else 0 for x in xrange(1,9)] for y in xrange(1,9)])
-                board_enemy = np.array([[1 if g.Pos(x, y) not in [next, 0] else 0 for x in xrange(1,9)] for y in xrange(1,9)])
+                board_me = np.array([[1 if h.Pos(x, y) == h.Next() else 0 for x in xrange(1,9)] for y in xrange(1,9)])
+                board_enemy = np.array([[1 if h.Pos(x, y) not in [h.Next(), 0] else 0 for x in xrange(1,9)] for y in xrange(1,9)])
                 point = np.sum(board_me * BOARD_FIN) - np.sum(board_enemy * BOARD_FIN)
                 return {'point': point, 'best_move': None}
         
@@ -291,54 +260,36 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
         best_move = random.choice(validmove)
         if g.Next() == next: # next is me 
             point = -100
-            for i, move in enumerate(validmove):
-                new_index = [i] + index 
+            for move in validmove:
                 g_next = g.NextBoardPosition(move)
-                result = self.choose_final(g_next, depth - 1, next, new_index)
-                self.best_point[depth-1] = {}
-                if not self.best_point[depth].has_key(new_index[1]):
-                        self.best_point[depth][new_index[1]] = result['point']
-                if len(new_index) > 2:
-                        if self.best_point[depth + 1].has_key(new_index[2]):
-                                if result['point'] > self.best_point[depth+1][new_index[2]]:
-                                        logging.info("cut")
-                                        point = result['point']
-                                        best_move = move
-                                        break
+                result = self.choose(g_next, depth - 1, next)
                 if result['point'] > point:
-                        point = result['point']
-                        best_move = move
-                        self.best_point[depth][new_index[1]] = result['point']
+                    point = result['point']
+                    best_move = move
 
         elif g.Next() != next: # next is enemy
             point = 100
-            for i, move in enumerate(validmove):
-                new_index = [i] + index
+            for move in validmove:
                 g_next = g.NextBoardPosition(move)
-                result = self.choose_final(g_next, depth - 1, next, new_index)
-                self.best_point[depth-1] = {}
-                if not self.best_point[depth].has_key(new_index[1]):
-                        self.best_point[depth][new_index[1]] = result['point']
-                if len(new_index) > 2:
-                        if self.best_point[depth + 1].has_key(new_index[2]):
-                                if result['point'] < self.best_point[depth+1][new_index[2]]:
-                                        logging.info("short")
-                                        point = result['point']
-                                        best_move = move
-                                        break
+                result = self.choose(g_next, depth - 1, next, open_point - openness)
                 if result['point'] < point:
                     point = result['point']
                     best_move = move
-                    self.best_point[depth][new_index[1]] = result['point']
         return {'point': point, 'best_move': best_move}
 
 
-    def calculatePoint(self, h, next):
+    def calculatePoint(self, h):
         # more is better
-        #logging.info(next==h.Next())
-        board_me = np.array([[1 if h.Pos(x, y) == next else 0 for x in xrange(1,9)] for y in xrange(1,9)])
-        board_enemy = np.array([[1 if h.Pos(x, y) not in [next, 0] else 0 for x in xrange(1,9)] for y in xrange(1,9)])
+        board_me = np.array([[1 if h.Pos(x, y) == h.Next() else 0 for x in xrange(1,9)] for y in xrange(1,9)])
+        board_enemy = np.array([[1 if h.Pos(x, y) not in [h.Next(), 0] else 0 for x in xrange(1,9)] for y in xrange(1,9)])
+        #empty = np.array([[1 if h_next.Pos(x, y) == 0 else 0 for x in range(1,9)] for y in range(1,9)])
+        #empty = np.sum(empty)
         point = len(h.ValidMoves()) + np.sum(board_me * BOARD_2) - np.sum(board_enemy * BOARD_2)
+        #logging.info("len=%d, point=%d, enemy=%d", len(h.ValidMoves()), np.sum(board_me*BOARD_2), np.sum(board_enemy*BOARD_2))
+        #if empty < 7:
+        #        point += np.sum(board * BOARD_FIN)
+        #else:
+        #        point += np.sum(board * BOARD_2)
         return point
 
     def calculateOpenness(self, h, h_next):
@@ -353,4 +304,3 @@ Paste JSON here:<p/><textarea name=json cols=80 rows=24></textarea>
 app = webapp2.WSGIApplication([
     ('/', MainHandler)
 ], debug=True)
-
